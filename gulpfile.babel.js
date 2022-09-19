@@ -1,41 +1,45 @@
 import gulp from "gulp";
 import gpug from "gulp-pug";
 import del from "del";
+import ws from "gulp-webserver";
 
 const routes = {
   pug: {
     src: "src/*.pug",
-    dest: "build"
+    dest: "build",
   },
 };
 
-//3)
 const pug = () =>
   gulp.src(routes.pug.src).pipe(gpug()).pipe(gulp.dest(routes.pug.dest));
 
-//1)
-const clean = () => del(["build"]);
+const clean = () => del(["build/"]);
 
-//4)
+//1)
+const webserver = () =>
+  gulp.src("build") //2)
+    .pipe(
+      ws({
+        //3)
+        livereload: true, //4)
+        open: true,
+      })
+    );
+
 const prepare = gulp.series([clean]);
 
-//4)
 const assets = gulp.series([pug]);
 
-//2) //5)
-export const dev = gulp.series([prepare, assets]);
+//5)
+const postDev = gulp.series([webserver]);
+
+export const dev = gulp.series([prepare, assets, postDev]); //6)
 
 /*
-1) clean이라는 task를 만들고, 얘가 할 일을 작성해줌. 즉 build폴더를 삭제해줌
-2) clean이라는 task를 series에 추가해줌
-
-+ 코드 정리
-
-2)에서 보면 series에 두개가 다른 일을 하고 있음(빌드를 위한 준비 작업-clean, 파일 변환-pug)
-
-3) export는 삭제해줌.(여기서 필요없는거였음). export는 package.json에서 쓸 command만 해주면 됨! 
-
-4) prepare라는 task를 만들어서, 준비과정만 다루는 task로 정리해줌 / assets이라는 task 만들어서 파일 변환되는 task로 정리함.
-
-5) 기존의 clean대신에 prepare를 넣어줌 / 기존의 pug대신 assets 넣어줌.
+1) 웹서버 실행 task를 만들어줌
+2) src의 경로는 보여주고 싶은 폴더. 여기서는 빌드된 파일 보여줘야 하므로 build 폴더 작성 
+3) pipe에서 ws(webserver)를 실행해줌
+4) 공식문서 참고해서 필요한 옵션 설정해줌
+5) task분리해주고 
+6) series에 추가해줌
 */
