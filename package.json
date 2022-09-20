@@ -25,13 +25,16 @@
     "gulp-pug": "^5.0.0"
   },
   "dependencies": {
+    "babelify": "^10.0.0",
     "del": "^4.1.1",
     "gulp-autoprefixer": "^8.0.0",
+    "gulp-bro": "^2.0.0",
     "gulp-csso": "^4.0.1",
     "gulp-image": "^6.2.1",
     "gulp-sass": "^5.1.0",
     "gulp-webserver": "^0.9.1",
-    "node-sass": "^7.0.3"
+    "node-sass": "^7.0.3",
+    "uglifyify": "^5.0.2"
   },
   "browserslist": [
     "last 2 versions"
