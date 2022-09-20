@@ -4,9 +4,10 @@ import del from "del";
 import ws from "gulp-webserver";
 import image from "gulp-image";
 import autop from "gulp-autoprefixer";
-import miniCSS from "gulp-csso"; 
-import bro from "gulp-bro" //1)
-import babelify from "babelify" //1)
+import miniCSS from "gulp-csso";
+import bro from "gulp-bro";
+import babelify from "babelify";
+import ghPages from "gulp-gh-pages"; //1)
 
 const sass = require("gulp-sass")(require("node-sass"));
 
@@ -21,23 +22,21 @@ const routes = {
     dest: "build/img",
   },
   scss: {
-    watch: "src/scss/**/*.scss", 
+    watch: "src/scss/**/*.scss",
     src: "src/scss/style.scss",
     dest: "build/css",
   },
-  //2)
   js: {
-    src:"src/js/main.js", //2-1)
-    dest:"build/js",
-    watch: "src/js/*.js" //5-1)
-
-  }
+    src: "src/js/main.js",
+    dest: "build/js",
+    watch: "src/js/*.js",
+  },
 };
 
 const pug = () =>
   gulp.src(routes.pug.src).pipe(gpug()).pipe(gulp.dest(routes.pug.dest));
 
-const clean = () => del(["build/"]);
+const clean = () => del(["build/", ".publish"]); //4)
 
 const webserver = () =>
   gulp.src("build").pipe(
@@ -50,18 +49,31 @@ const webserver = () =>
 const img = () =>
   gulp.src(routes.img.src).pipe(image()).pipe(gulp.dest(routes.img.dest));
 
-const styles = () => gulp.src(routes.scss.src).pipe(sass().on('error', sass.logError)).pipe(autop()).pipe(miniCSS()).pipe(gulp.dest(routes.scss.dest)) 
+const styles = () =>
+  gulp
+    .src(routes.scss.src)
+    .pipe(sass().on("error", sass.logError))
+    .pipe(autop())
+    .pipe(miniCSS())
+    .pipe(gulp.dest(routes.scss.dest));
 
-//3)
-const js = () => gulp.src(routes.js.src).pipe(bro({
-  //4)
-  transform:[
-    babelify.configure({
-      presets:['@babel/preset-env']
-    }), 
-    [ 'uglifyify', { global: true } ]
-  ]
-})).pipe(gulp.dest(routes.js.dest))
+const js = () =>
+  gulp
+    .src(routes.js.src)
+    .pipe(
+      bro({
+        transform: [
+          babelify.configure({
+            presets: ["@babel/preset-env"],
+          }),
+          ["uglifyify", { global: true }],
+        ],
+      })
+    )
+    .pipe(gulp.dest(routes.js.dest));
+
+//2) 
+const gh = () => gulp.src("build/**/*").pipe(ghPages())
 
 const watch = () => {
   gulp.watch(routes.pug.watch, pug);
@@ -72,21 +84,35 @@ const watch = () => {
 
 const prepare = gulp.series([clean, img]);
 
-const assets = gulp.series([pug, styles, js]); //6)
+const assets = gulp.series([pug, styles, js]);
 
 const postDev = gulp.parallel([webserver, watch]);
 
-export const dev = gulp.series([prepare, assets, postDev]);
+//3-1)
+export const build = gulp.series([prepare, assets]);
+
+export const dev = gulp.series([build, postDev]); // 3-2)
+//3-2)
+export const deploy = gulp.series([build, gh, clean]) //5)
+
+
+
 
 /*
-1) 설치한 gulp-bro과 babelify를 import해줌
-2) task에 사용될 src를 routes로 만들어줌
-2-1) src 경로에는 파일 하나만 작성해주면 됨. 왜냐하면, js>util.js는 import해서 main.js에서 사용되기 때문
-3) 새로운 task를 만들어줌
-4) gulp-bro 가이드를 보고 transform 작성해줌. 여기서 preset에는 가이드처럼 es2015를 쓰는게 아니고 우리가 진짜 사용하는 @babel/preset-env를 작성해줌
-만약에 react로 작업중이라면 preset에 react preset을 넣어줌
-5) js는 모든 파일을 지켜봐야 하므로 watch에 작성해줌
-5-1)에서 watch할 파일 경로 작성
-6) 파일이 변환되어야 하므로 이에 관한 task인 assets에 넣어줌 => 이렇게 하면 처음에 실행하고 그 이후부터 쭉 watch하게 됨
-∴ 파일 실행하면 main.js에 작성한 내용이 콘솔에 뜨게 됨 + build>js>main.js 파일을 확인해보면 스크립트가 babel에 의해 변환되어 나오는 걸 알 수 있음
+1) 설치한 gulp-gh-pages를 사용하도록 gulpfile.babel.js에 import함
+2) 새로운 task를 만들어줌
+3) export를 하나 더 하기 위해 package.json에 작성한 build, dev라는 커맨드 외에 deploy라는 스크립트를 하나 더 만들어줌(package.json 참조)
+  3-1) build를 만들어줌. build가 하는 일은, postDev를 제외하고 prepare, assets만 넣어줌. (얘네 둘을 build로 분리해서 사용한다고 보면 됨)
+  3-2) prepare, assets을 build로 분리했으므로
+  3-3) deploy를 만들어줌. 얘는 build하고 배포를 담당하게 됨
+
+  ∴ gulp dev, gulp build 실행하면 잘 작동하는 걸 확인 할 수 있음. 
+  ∴ gulp deploy 실행하면 .publish폴더가 생기는데, 이건 캐시같은거라 필요없으니 지워주는 작업을 해주면 됨. (이전에 사용했던 clean에 폴더를 지우게 함)
+  그리고 터미널에 branch를 만들었고, push했다고 나옴. 
+4) 이전에 사용했던 clean에 불필요한 폴더인 .publish를 지우게 함
+5) deploy할때 clean을 다시 실행하도록 넣어줌
+
+∴ 브라우저에서 github.io url로 페이지 배포됐는지 확인
+url : 리포지토리명.github.io/리포지토리명
+즉, 여기서는 wisdom0924.github.io/gulp_nomad (재확인 필요함)
 */
